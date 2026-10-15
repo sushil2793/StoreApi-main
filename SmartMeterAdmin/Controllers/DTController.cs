@@ -212,8 +212,12 @@ namespace SmartMeterAdmin.Controllers
 
         [HttpDelete]
         [Route("DeleteDTRecord")]
-        public async Task<IActionResult> DeleteDTRecord(string consumerId)
+        public async Task<IActionResult> DeleteDTRecord(string consumerId, string password)
         {
+            string AuthenticationPassword = configuration.GetSection("Authentication")["Password"];
+            if (AuthenticationPassword != password)
+                return Ok(jsonResponseFromat.JsonMessage(false, PasswordNotMatch));
+
             await dt.DeleteDTRecord(consumerId);
             return Ok(jsonResponseFromat.JsonMessage(true, DeletedSuccess));
         }

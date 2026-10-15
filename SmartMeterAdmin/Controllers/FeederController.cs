@@ -241,8 +241,12 @@ namespace SmartMeterAdmin.Controllers
 
         [HttpDelete]
         [Route("DeleteFeederRecord")]
-        public async Task<IActionResult> DeleteFeederRecord(string consumerId) // Update parameter name
+        public async Task<IActionResult> DeleteFeederRecord(string consumerId, string password) // Update parameter name
         {
+            string AuthenticationPassword = configuration.GetSection("Authentication")["Password"];
+            if (AuthenticationPassword != password)
+                return Ok(jsonResponseFromat.JsonMessage(false, PasswordNotMatch));
+
             await feeder.DeleteFeederRecord(consumerId); // Update parameter name
             return Ok(jsonResponseFromat.JsonMessage(true, DeletedSuccess));
         }

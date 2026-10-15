@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using SmartMeterAdmin.Data.HelpEntity;
 using SmartMeterAdmin.Infrastructure.Helpers;
 using SmartMeterAdmin.Services.Help;
@@ -13,11 +14,13 @@ namespace SmartMeterAdmin.Controllers
     {
         private readonly IHelpDocument _helpDocument;
         private readonly IJsonResponseFromat _jsonResponseFromat;
+        private readonly IConfiguration _configuration;
 
-        public HelpDocumentController(IHelpDocument helpDocument, IJsonResponseFromat jsonResponseFromat)
+        public HelpDocumentController(IHelpDocument helpDocument, IJsonResponseFromat jsonResponseFromat, IConfiguration configuration)
         {
             _helpDocument = helpDocument;
             _jsonResponseFromat = jsonResponseFromat;
+            _configuration = configuration;
         }
 
 
@@ -70,10 +73,13 @@ namespace SmartMeterAdmin.Controllers
         [Route("DeleteHelpDocument")]
        
         [HttpGet]
-        public async Task<IActionResult> DeleteNewMeter(int id)
+        public async Task<IActionResult> DeleteNewMeter(int id, string password)
         {
-            
-                var result = await _helpDocument.GetHelpDocumentById(id);
+            string AuthenticationPassword = _configuration.GetSection("Authentication")["Password"];
+            if (AuthenticationPassword != password)
+                return Ok(_jsonResponseFromat.JsonMessage(false, PasswordNotMatch));
+
+            var result = await _helpDocument.GetHelpDocumentById(id);
                 result.IsActive = false;
                 result.IsDelete = true;
                 result.UpdatedBy = 1;

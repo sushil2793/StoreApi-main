@@ -65,6 +65,10 @@ namespace SmartMeterAdmin.Controllers
         [HttpPost]
         public async Task<IActionResult> DeleteArea([FromBody] ListOfId data)
         {
+            string AuthenticationPassword = configuration.GetSection("Authentication")["Password"];
+            if (AuthenticationPassword != data.Password)
+                return Ok(jsonResponseFromat.JsonMessage(false, PasswordNotMatch));
+
             var ids = basicUtility.GenrateCommaStringIds(data.ID);
             await master.DeleteArea(data.Password, ids);
             return Ok(jsonResponseFromat.JsonMessage(true, DeletedSuccess));

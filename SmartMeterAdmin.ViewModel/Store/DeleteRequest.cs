@@ -7,5 +7,6 @@ namespace SmartMeterAdmin.ViewModel.Store
         public string ActionType { get; set; }
         public List<string> KeyValues { get; set; }
         public string DeletedBy { get; set; }
+        public string Password { get; set; }
     }
 }

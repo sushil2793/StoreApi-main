@@ -1,10 +1,12 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using SmartMeterAdmin.Infrastructure.Enumeration;
 using SmartMeterAdmin.Infrastructure.Helpers;
 using SmartMeterAdmin.Services.User;
 using SmartMeterAdmin.ViewModel.AuditLog;
 using SmartMeterAdmin.ViewModel.UserViewModel;
+using static SmartMeterAdmin.Infrastructure.Helpers.ConstantValues;
 
 namespace SmartMeterAdmin.Controllers
 {
@@ -13,15 +15,17 @@ namespace SmartMeterAdmin.Controllers
     [Route("api/User")]
     public class UserController : Controller
     {
-        public UserController(IUser user, IJsonResponseFromat jsonResponseFromat, IBasicUtility basicUtility)
+        public UserController(IUser user, IJsonResponseFromat jsonResponseFromat, IBasicUtility basicUtility, IConfiguration configuration)
         {
             BasicUtility = basicUtility;
             this.user = user;
             JsonResponseFromat = jsonResponseFromat;
+            this.configuration = configuration;
         }
         public IBasicUtility BasicUtility { get; }
         private CryptoUtility cryptoUtility;
         private readonly IUser user;
+        private readonly IConfiguration configuration;
 
         public IJsonResponseFromat JsonResponseFromat { get; }
 
@@ -115,9 +119,7 @@ namespace SmartMeterAdmin.Controllers
             return Ok(JsonResponseFromat.JsonMessage(true, "User Details", userData));
 
 
-
         }
-
 
         [Route("GetUserProfileByID")]
         [HttpGet]
@@ -134,8 +136,11 @@ namespace SmartMeterAdmin.Controllers
 
         [Route("DeleteUser")]
         [HttpGet]
-        public async Task<IActionResult> DeleteUser(int id)
+        public async Task<IActionResult> DeleteUser(int id, string password)
         {
+            string AuthenticationPassword = configuration.GetSection("Authentication")["Password"];
+            if (AuthenticationPassword != password)
+                return Ok(JsonResponseFromat.JsonMessage(false, PasswordNotMatch));
 
             await user.ActivateUser(id, User.Identity.GetUserId(), true);
             return Ok(JsonResponseFromat.JsonMessage(true, "Delete User List", id));

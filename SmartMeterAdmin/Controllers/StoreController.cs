@@ -37,13 +37,17 @@ namespace SmartMeterAdmin.Controllers
             IWebHostEnvironment env,
             IJsonResponseFromat jsonResponseFromat,
             IStore store,
-            IBasicUtility basicUtility)
+            IBasicUtility basicUtility,
+            Microsoft.Extensions.Configuration.IConfiguration configuration)
         {
             this.env = env;
             this.jsonResponseFromat = jsonResponseFromat;
             this.store = store;
             this.basicUtility = basicUtility;
+            this.configuration = configuration;
         }
+
+        private readonly Microsoft.Extensions.Configuration.IConfiguration configuration;
 
         [HttpPost]
         [Route("ImportIssueMeterByExcel")]
@@ -155,6 +159,10 @@ namespace SmartMeterAdmin.Controllers
         [HttpPost]
         public async Task<IActionResult> DeleteData([FromBody] DeleteRequest request)
         {
+            string AuthenticationPassword = configuration.GetSection("Authentication")["Password"];
+            if (AuthenticationPassword != request.Password)
+                return Ok(jsonResponseFromat.JsonMessage(false, PasswordNotMatch));
+
             if (string.IsNullOrWhiteSpace(request.DeletedBy) || request.KeyValues == null || request.KeyValues.Count == 0)
             {
                 return BadRequest(jsonResponseFromat.JsonMessage(false, "DeletedBy and KeyValues are required."));
