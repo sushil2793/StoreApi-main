@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- https://go.microsoft.com/fwlink/?LinkID=208121. -->
+<Project>
+  <PropertyGroup>
+    <TimeStampOfAssociatedLegacyPublishXmlFile />
+    <_PublishTargetUrl>C:\Users\sushi\OneDrive\Desktop\DONETAPI</_PublishTargetUrl>
+    <History>False|2026-10-03T09:26:17.7372168Z||;False|2026-09-29T17:18:48.1864480+05:30||;</History>
+    <LastFailureDetails />
+  </PropertyGroup>
+  <ItemGroup>
+    <DestinationConnectionStrings Include="DevConnection">
+      <Value>Server=localhost%3bDatabase=StoreDB%3bUser Id=sushil%3bPassword=Sushil%40123%3bTrustServerCertificate=True%3bMultipleActiveResultSets=True%3b</Value>
+    </DestinationConnectionStrings>
+    <DestinationConnectionStrings Include="ExcelConString">
+      <Value>Server=localhost%3bDatabase=StoreDB%3bUser Id=sushil%3bPassword=Sushil%40123%3bTrustServerCertificate=True%3bMultipleActiveResultSets=True%3b</Value>
+    </DestinationConnectionStrings>
+    <DestinationConnectionStrings Include="OleDevConnection">
+      <Value>Server=localhost%3bDatabase=StoreDB%3bUser Id=sushil%3bPassword=Sushil%40123%3bTrustServerCertificate=True%3bMultipleActiveResultSets=True%3b</Value>
+    </DestinationConnectionStrings>
+  </ItemGroup>
+</Project>

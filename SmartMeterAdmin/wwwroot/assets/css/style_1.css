@@ -1,0 +1,47 @@
+.bio_name{
+font-size: 18px;
+font-weight: 600;
+color: rgb(83, 81, 81);
+}
+
+.bio_name_1{
+    font-size: 15px;
+}
+
+.row_row .col-md-4,.row_row .col-md-8{
+margin-bottom: 5px;
+          }
+
+.meter_image img{
+width: 200px;
+                }
+
+.bill_image img{
+    width: 200px;
+    height: 132px;
+                }
+ 
+.id_proof img{
+        width: 150px;
+             }
+
+.location_1 span{
+    font-size: 15px;
+}
+
+.user_type{
+    margin-top: auto;
+    text-align: left;
+}
+
+.validationCustom_15{
+    margin-right: 30px;
+}
+
+.footer-section p{
+    text-align: center !important;
+}
+
+.validationCustom_25{
+    margin-right: 30px;
+}
