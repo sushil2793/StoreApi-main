@@ -551,6 +551,10 @@ namespace SmartMeterAdmin.Controllers
         [HttpPost]
         public async Task<IActionResult> DeleteTableTemplate([FromBody] ListOfId ids)
         {
+            string AuthenticationPassword = configuration.GetSection("Authentication")["Password"];
+            if (AuthenticationPassword != ids.Password)
+                return Ok(jsonResponseFromat.JsonMessage(false, PasswordNotMatch));
+
             foreach (var item in ids.ID)
             {
                 var data = new TableTemplate
