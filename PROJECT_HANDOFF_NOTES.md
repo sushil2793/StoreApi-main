@@ -1,8 +1,190 @@
 # REPLACEMENT METER - PROJECT STATUS (Handoff Notes)
+# Last updated: 22-Oct-2026 - DT->DTC: SAB SCRIPTS EK FILE ME: DT_TO_DTC_FULL_RUN_ONE_FILE.sql (STEP 1..8, 8 consumers baked, delete @@Confirm gate + rollback proc). PURANI 4 script files DELETE ho gayin.
+# Last updated: 21-Oct-2026 - DT->DTC DATA SHIFT SCRIPT (Excel/notepad driven, LOCAL TESTED - PROD KAL KARNA HAI - STEP-BY-STEP GUIDE NEECHE)
+# >>> 21-Oct: DT survey data ko DTC side (DTCSurvey/DTCSurveyMeter/DTCNewMeterDetails) me shift karne ka GENERIC script bana. 3 fields (ConsumerId | NewConsumerId | NewSmartMeterSrNo) Excel/notepad se deta hai user, baaki sab DT side se auto-map hota hai. 4 files: DT_TO_DTC_SHIFT_SQL_NOTES.sql (copy+backup) + DT_TO_DTC_VERIFY_SQL_NOTES.sql (compare) + DT_TO_DTC_DELETE_SQL_NOTES.sql (delete - ALAG, user compare karke chalayega) + DT_TO_DTC_INPUT_TEMPLATE.txt. Local pe 2 consumers (803HAZ0219/803HAZ0220) pe E2E TEST PASS (44 fields field-by-field PASS, API se bhi verify). PROD PE KAL KARNA HAI - STEP-BY-STEP GUIDE SESSION 21-Oct section me. <<<
 # Last updated: 10-Oct-2026 - AUDIT ACCESS: PERMISSIONS 3 -> 2 (View | Edit & Delete), CanDelete REMOVED - DB/API/UI + LOCAL TEST + PROD DEPLOY (DB+API DONE, UI DIST COPY BAKI)
 # >>> 03-Oct: Consumer push (UpdateHesStatus CONSUMER) ab sync 1-by-1 hota hai aur response me poora push log (payload + HES response + status) aata hai. UI ME KOI CHANGE NAHI. Backend 4 files, build 0 errors, DEPLOY PENDING (neeche Session 03-Oct). <<<
 # >>> 10-Oct: Audit access permissions 3 se 2 hui - ab sirf View aur combined "Edit & Delete" hai. CanDelete DB column/API param/UI checkbox SAB JAGAH HATA DIYA (user ne Option B chuna). Migration script USER_AUDIT_ACCESS_DROP_CANDELETE_SQL_NOTES.sql (repo root) - local+prod DB run ho gaya, backend 5 files deploy ho gaya (DONETAPI publish). PROD UI dist copy BAKI (neeche Session 10-Oct). <<<
 # >>> 30-Sep: 3 naye Satnam admin users production pe deploy ho gaye (user ne). Admin full-scope ka SQL fix READY - production pe RUN BAKI hai. Production UI bundle bhi PURANA hai - dist copy BAKI. EDIT BUTTON FIX = Users.Access=1 UPDATE (production pe RUN BAKI) - alag script file user ne DELETE kar di, fix ab USER_MANAGE_TEMPLATE_SQL_NOTES.sql ke sath run hoga (neeche dekho). <<<
+
+## ============================================================ SESSION 21-Oct: DT -> DTC DATA SHIFT SCRIPT (LOCAL TESTED, PROD PENDING) ============================================================
+
+USER REQUIREMENT: kuch consumers jo DT side (DTSurvey / DTMeter / DTNewMeterDetails) me hain,
+unhe DTC side (DTCSurvey / DTCSurveyMeter / DTCNewMeterDetails) me chahiye. Future me Excel me
+sirf 3 fields dega (ConsumerId | NewConsumerId | NewSmartMeterSrNo) - baaki sab auto-derive hona
+chahiye. Pehle LOCAL, phir PROD script.
+
+### FILES (repo root) - UPDATE 22-Oct: SINGLE FILE
+- **`DT_TO_DTC_FULL_RUN_ONE_FILE.sql`** - EK HI FILE, STEP 1..8: [1] prep backup+counts,
+  [2] data load + source check, [3] SHIFT (proc + exec, idempotent), [4] pre-delete verify
+  (PASS/**DIFF** + DTC safety check), [5] DELETE par @@Confirm BIT gate - pehla EXEC dbo.SHIFT... preview
+  only, confirm ke liye `EXEC dbo.DELETE_DT_AFTER_SHIFT 1;` uncomment karna pada hai,
+  [6] post-delete backup-vs-DTC verify (@Suffix; backup-table list query bhi hai), [7] final counts,
+  [8] ROLLBACK proc (CREATE hota hai par EXEC commented hai - emergency only).
+- 8 consumers ka data isi file ke STEP 2 @@Paste block me baked hai:
+  803HAZ0316|1000275314|MZ0006118, 803HAZ0109|1000274599|MZ0006175, TPSDTR0004|1000276714|MZ0006341,
+  803HAZ0218|1000277176|MZ0006457, 802HAZ0419|1000276527|MZ0000709, 802HAZ0423|1000275617|MZ0006866,
+  803HAZ0223|1000275639|MZ0001438, 803HAZ0225|1000340023|MZ0001439
+- PURANI 4 files (SHIFT/VERIFY/DELETE .sql + INPUT_TEMPLATE.txt) 22-Oct ko DELETE kar di
+  (user ne bola) - unka logic upar wali single file me merge hai + git history me recoverable.
+- `DT_TO_DTC_PROD_RUN_GUIDE.md` abhi bhi hai (expected-output details; par ab single file pe point karta hai).
+- PURANE FILES (reference ke liye, AB NAHI HAIN): DT_TO_DTC_SHIFT_SQL_NOTES.sql (backup + COPY + verify + compare, DELETE nahi karta),
+  DT_TO_DTC_VERIFY_SQL_NOTES.sql (SECTION A = live DT vs DTC delete se pehle + SECTION B = backup vs DTC delete ke baad),
+  DT_TO_DTC_DELETE_SQL_NOTES.sql (delete + rollback block), DT_TO_DTC_INPUT_TEMPLATE.txt.
+
+### KAISE CHALAO (PROD ORDER)
+1. `DT_TO_DTC_SHIFT_SQL_NOTES.sql` -> SECTION 2 me apne Excel/notepad rows paste karo
+   (format: `ConsumerId|NewConsumerId|NewSmartMeterSrNo`, 1 row per line; TAB/comma/semicolon
+   bhi auto-normalize ho jata hai) -> uske baad Section 3-6 chalao.
+2. `DT_TO_DTC_VERIFY_SQL_NOTES.sql` -> SECTION A chalao (live compare) - sab 'PASS' hona chahiye.
+3. `DT_TO_DTC_DELETE_SQL_NOTES.sql` chalao -> DT rows (DTSurvey/DTMeter/DTNewMeterDetails) delete.
+4. Delete ke baad `DT_TO_DTC_VERIFY_SQL_NOTES.sql` SECTION B chalao (backup vs DTC) - PASS confirm.
+5. Section 3 (ROLLBACK) commented block hai - galat ho gaye to @Suffix date set karke EXEC karo.
+
+### IMPORTANT DESIGN FACTS (jo future me bhoolna mat)
+- **ConsumerId CHANGED NAHI hota** (803HAZ0220 wahi rehta hai) - sirf NewConsumerId add hota hai.
+  Reason: `GET_NEWMETER_COUNT_WEB` / `GET_SURVEY_COUNT_WEB` me DTC counts
+  `INNER JOIN DTConsumer ON ConsumerId` - aur DTConsumer me DT consumer id hi hai
+  (DTConsumer 2064 rows = DTMeter count; ye DT side ka master hai, name misleading hai).
+  ConsumerId badal diya to DTC dashboard count 0 ho jayega.
+- `DTConsumer` TABLE DELETE/UPDATE NAHI hota - sirf 3 DT tables delete hote hain.
+- Staging table `dbo.Temp_DT_TO_DTC_Shift` PERSISTENT hai (shift + delete dono scripts usi se
+  chalte hain) - user compare ke beech me data nahi khone se bachata hai.
+- Mapping: DTSurvey->DTCSurvey (+DTConsumer se Zone/Circle/Division/Subdivision/Substation/
+  Feeder/District), DTMeter->DTCSurveyMeter (Make/Type/Status/GPRS/CtRatio/DtRatingKVA),
+  DTNewMeterDetails->DTCNewMeterDetails (readings/photos/HesSend/LineCTRatio/LinePTRatio).
+- DT me jo field nahi hai (ConsumerName/AadharNo/Mobile/Address/TarrifName/old meter seal no)
+  wo DTC me NULL jaata hai - Source me data hi nahi hai.
+- Backup tables (auto, date-suffix): BK_DT_TO_DTC_{SURVEY,METER,NEWMETER}_YYYYMMDD (shift se pehle)
+  + BK_DT_TO_DTC_DELETE_{SURVEY,METER,NEWMETER}_YYYYMMDD (delete se pehle). ROLLBACK inhe use karta hai.
+- Re-run safe: DTC row pehle se exist karta hai to UPDATE hota hai (duplicate nahi banta).
+
+### LOCAL TEST (21-Oct, E2E PASS - StoreDB localhost)
+- Data: 803HAZ0220|1000277109|MZ0006886 aur 803HAZ0219|1000277086|MZ0006458
+- Shift: DTCSurvey 70->72, DTCSurveyMeter 65->67, DTCNewMeterDetails 57->59 (2 baar re-run kiya,
+  duplicate nahi bane - idempotent OK)
+- Delete: DT tables se 2-2 rows hat gaye (DTSurvey 2063->2061, DTMeter 2064->2062,
+  DTNewMeterDetails 1832->1830), DTC rows intact
+- ROLLBACK bhi test kiya (backup se 2-2 rows wapas aaye) phir dobara delete
+- API verify: api/DTC/GetAllDTCMeterRender = 2 rows, api/Meter/GetAllNewDTCMeterRender = 2 rows
+  (NewSmartMeterSrNo MZ0006886/MZ0006458, HesSend COMPLETED, CT Meter type ProductionMeter se)
+- Dashboard: totalDTCNewMeter 56->58, totalDTNewMeter 1832->1830 (shift ka maqsad - DT se DTC me gaya)
+
+### FULL VERIFICATION (21-Oct - field-by-field + API, sab PASS)
+- `DT_TO_DTC_VERIFY_SQL_NOTES.sql` SECTION B (backup vs DTC) => 2 consumers x 3 table-pairs
+  = **PASS PASS PASS** (saare 44 mapped fields exact match, 0 DIFF)
+- DB table scan (DT/DTC flow ke 24 tables): DTSurvey/DTMeter/DTNewMeterDetails = 0 rows,
+  DTCSurvey/DTCSurveyMeter/DTCNewMeterDetails = 2 rows each, DTConsumer = 2 (unchanged),
+  ProductionMeter(SRN) = 2, SurveyRecivedData/SurveyRecivedMeter = 2 (MDM master - NewConsumerId
+  1000277086/1000277109 wahan maujood hai, valid hai), DTRecived*/TempDT*/SwapMeter/
+  Replacement_*Meter/HES = 0 (koi leftover nahi)
+- API list endpoints (500 rows pull karke check): DT lists me 0 of ours, DTC lists me 2 of ours
+- API detail endpoints: api/DTC/GetDTCDetails + api/Meter/GetNewDTCMeterDetails -> data de rahe
+  hain; api/DT/GetDTDetails + api/Meter/GetNewDTMeterDetails -> null (DT side khaali) ✓
+- PRE-EXISTING BUG (shift se related NAHI): `api/Meter/GetDTCNewMeterByConsumerId` 500 deta hai
+  - control consumer 1000070306 pe bhi 500 (proc 'GetDTCNewMeterByConsumerId' hi kharab hai)
+- PRE-EXISTING GAP (shift se related NAHI): GetDTCMeterDetails proc me subdivision/district/
+  contractorName/meterType select hi nahi hai -> ViewModel me null (control consumer pe bhi null)
+- NOTE: `WITH (ORDINALITY)` is SQL build (2022 RTM 16.0.1210.3) me NAHI chal raha - script
+  CHARINDEX-based parser use karta hai (delimiter auto-normalize: TAB/comma/semicolon -> pipe)
+
+### PROD STATUS
+- SQL scripts ready hain, PROD pe ABHI NAHI chala. Koi API/UI change nahi - pure DB script hai.
+- PROD pe script chalao to DTC survey + DTC new meter screens me rows dikhenge (UI already support karta hai).
+
+### ============================================================
+### PROD RUN GUIDE - STEP BY STEP (kal production pe karne ke liye)
+### ============================================================
+
+STEP 0 - PREP (5 min)
+  0.1 SSMS kholo -> production DB (StoreDB) select karo. `USE [StoreDB]` script me already hai.
+      (SAHI DB CHECK: production me DB ka naam 'StoreDB' hona chahiye - agar alag hai to script
+       ke 'USE [StoreDB]' line ko change kar dena)
+  0.2 Ek BACKUP lo (safety):
+      SELECT * INTO dbo.BK_DTC_PRE_SHIFT_20261022 FROM dbo.DTCSurvey;
+      SELECT * INTO dbo.BK_DTCSM_PRE_SHIFT_20261022 FROM dbo.DTCSurveyMeter;
+      SELECT * INTO dbo.BK_DTCNM_PRE_SHIFT_20261022 FROM dbo.DTCNewMeterDetails;
+      (date apne hisaab se change karna - jo date aaj raat ko prod pe kar rahe ho)
+  0.3 PROD me pehle se data kya hai, ye note kar lo (compare ke liye):
+      SELECT 'DTCSurvey' T, COUNT(*) C FROM dbo.DTCSurvey
+      UNION ALL SELECT 'DTCSurveyMeter', COUNT(*) FROM dbo.DTCSurveyMeter
+      UNION ALL SELECT 'DTCNewMeterDetails', COUNT(*) FROM dbo.DTCNewMeterDetails
+      UNION ALL SELECT 'DTSurvey', COUNT(*) FROM dbo.DTSurvey
+      UNION ALL SELECT 'DTMeter', COUNT(*) FROM dbo.DTMeter
+      UNION ALL SELECT 'DTNewMeterDetails', COUNT(*) FROM dbo.DTNewMeterDetails;
+
+STEP 1 - DATA PREPARE (10 min)
+  1.1 Excel me 3 column banao: ConsumerId | NewConsumerId | NewSmartMeterSrNo
+  1.2 Notepad me paste karo (pipe '|' se separated, 1 row per line). Template:
+      DT_TO_DTC_INPUT_TEMPLATE.txt
+      Excel se copy karne ho to TAB bhi chalega (script auto-normalize karta hai)
+  1.3 DHYAN DO: ConsumerId wahi hona chahiye jo DTSurvey/DTMeter/DTNewMeterDetails me hai
+      (yaani DT consumer id jaise 803HAZ0220). NewConsumerId naya MDM number (1000277109).
+
+STEP 2 - SHIFT CHALAO (5 min)  -> file: DT_TO_DTC_SHIFT_SQL_NOTES.sql
+  2.1 SSMS me file kholo (File > Open > DT_TO_DTC_SHIFT_SQL_NOTES.sql)
+  2.2 SECTION 2 me apna data paste karo (jo line DECLARE @Paste ... N'...' wali hai):
+        DECLARE @Paste NVARCHAR(MAX) = N'803HAZ0220|1000277109|MZ0006886
+        803HAZ0219|1000277086|MZ0006458';
+      (agar single row hai to N'...'; semicolon sahi rakho)
+  2.3 File chalao (F5 / Execute)
+  2.4 EXPECTED OUTPUT (sab 'OK' hona chahiye):
+        STAGING ROWS = <jitne rows diye>
+        Source check table: DtSurvey=OK, DtMeter=OK, DtNewMeter=OK (har row ke liye)
+        ShiftedConsumers = <rows>
+        DTCSurveyRows / DTCSurveyMeterRows / DTCNewMeterDetailsRows = <rows> each
+        BackupSurveyRows / BackupMeterRows / BackupNewMeterRows = <rows> each
+        DTrowsStillThere(Survey/Meter/NewMeter) = <rows> each  <-- ye abhi SAME hona chahiye
+                                                                 (delete toh abhi nahi hua)
+        Status column = OK (har row ke liye)
+      AGAR koi row me 'NO DTSurvey' / 'NO DTMeter' aaye -> wo consumer skip ho jayega.
+      ConsumerId me spelling check karo (space/typo). Phir dobara run karo (script safe hai).
+
+STEP 3 - VERIFY (compare, delete se PEHLE)  -> file: DT_TO_DTC_VERIFY_SQL_NOTES.sql
+  3.1 File kholo -> sirf SECTION A chalao (delete nahi hua hai abhi, to live compare sahi hai)
+  3.2 EXPECTED: DtSurveySrc / DtMeterSrc / DtNewMeterSrc = 'OK'
+                 DTCSurvey / DTCSurveyMeter / DTCNewMeterDetails = 'PASS' (har row me)
+      Koi '**DIFF**' aaya -> DELETE MAT KARO, mujhe batao (ya DT_TO_DTC_SHIFT_SQL_NOTES.sql
+      ka Section 4 compare output dekh ke kaunsa field alag hai).
+  3.3 Optional extra: DT_TO_DTC_SHIFT_SQL_NOTES.sql ka SECTION 4 (side-by-side DT vs DTC)
+
+STEP 4 - DELETE (user ke confirm ke baad)  -> file: DT_TO_DTC_DELETE_SQL_NOTES.sql
+  4.1 File kholo -> chalao (F5)
+  4.2 Script pehle dikhayega "WILL DELETE - ..." list aur DTC side safety check
+      (agar kisi consumer ka DTCSurvey row nahi bana hua to script apne aap ruk jayega - safe hai)
+  4.3 EXPECTED OUTPUT:
+        DTrowsLeft_Survey = 0
+        DTrowsLeft_Meter = 0
+        DTrowsLeft_NewMeter = 0
+        DTCrows_Survey / DTCrows_SurveyMeter / DTCrows_NewMeter = <rows> each (intact)
+
+STEP 5 - POST-DELETE VERIFY  -> file: DT_TO_DTC_VERIFY_SQL_NOTES.sql
+  5.1 SECTION B chalao (backup vs DTC compare) - @Suffix wahi date hona chahiye jo aaj ka hai.
+      Agar prod pe aaj raat ko 22-Oct ko kar rahe ho to:
+        SET @Suffix = '20261022';
+  5.2 EXPECTED: BackupSurvey/Meter/NewMeter = OK, aur 3 columns = PASS
+
+STEP 6 - UI CHECK (browser me)
+  6.1 DT New Meter list -> wo consumer NAHI dikhna chahiye
+  6.2 DTC Survey list + DTC New Meter list -> consumer DIKHNA chahiye
+      (NewSmartMeterSrNo = Excel wala, NewConsumerId = Excel wala)
+  6.3 Dashboard: DT new meter count girega, DTC new meter count badhega
+
+STEP 7 - (agar rollback chahiye)
+  DT_TO_DTC_DELETE_SQL_NOTES.sql ka SECTION 3 (ROLLBACK) uncomment karke @Suffix set karke chalao.
+  Backup tables se DT side wapas aa jayega.
+
+### IMPORTANT - PROD KE LIYE YAAD RAKHNE WALI BAATEIN
+- Script idempotent hai - 2 baar chalao to duplicate row nahi bane (UPDATE hota hai).
+  (Local pe 2 baar chala ke test kiya tha - DTCSurvey 70->72, 72 hi raha, duplicate nahi.)
+- Har run me backup tables banti hain: BK_DT_TO_DTC_{SURVEY,METER,NEWMETER}_<date> (shift me)
+  aur BK_DT_TO_DTC_DELETE_{SURVEY,METER,NEWMETER}_<date> (delete me).
+- Staging table dbo.Temp_DT_TO_DTC_Shift PERSISTENT hai - shift aur delete dono usi se chalte hain.
+  (Shift aur Delete ke beech me koi aur script usse DELETE mat karna!)
+- 'USE [StoreDB]' - production DB ka naam verify kar lena (script me hardcoded hai).
+- HES push / Hangfire kuch nahi badalta - HesSend value as-is copy hoti hai.
+- ProductionMeter me meter no (MZ000xxxx) pehle se hona chahiye - nahi hai to DTC new meter grid
+  me us meter ke columns (MeterType/ICCID/SIMNW/MeterBoxSealNo) NULL dikhenge (row dikhegi).
 
 ## ============================================================ SESSION 10-Oct: AUDIT ACCESS 2-PERMISSION (View | Edit & Delete) - CanDelete REMOVED - DB+API+UI, PROD DB/API DEPLOYED, PROD UI DIST COPY BAKI ============================================================
 
