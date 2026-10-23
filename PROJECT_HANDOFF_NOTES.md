@@ -1,5 +1,58 @@
 # REPLACEMENT METER - PROJECT STATUS (Handoff Notes)
+# Last updated: 23-Oct-2026 - CONSUMER EXCEL UPLOAD: IsReplacementMeter column add - DB (TempConsumerNewMeter + SYNCCONSUMERNEWMETER proc) + C# (mapping + BulkCopy optional-column guard) - LOCAL E2E TEST PASS, PROD DEPLOY PENDING (neeche Session 23-Oct)
 # Last updated: 22-Oct-2026 - DT->DTC: SAB SCRIPTS EK FILE ME: DT_TO_DTC_FULL_RUN_ONE_FILE.sql (STEP 1..8, 8 consumers baked, delete @@Confirm gate + rollback proc). PURANI 4 script files DELETE ho gayin.
+
+## ============================================================ SESSION 23-Oct: CONSUMER EXCEL UPLOAD - IsReplacementMeter COLUMN (LOCAL DONE + E2E PASS, PROD PENDING) ============================================================
+
+USER REQUIREMENT: ConsumerNewMeterDataExcel upload me user ab ek naya column "IsReplacementMeter"
+Excel me khud bharega - upload pe wo value final table (ConsumerNewMeterDetails) me update ho jaye.
+UI ME KOI CHANGE NAHI (Excel me hi column bharna hai).
+
+### FLOW (kaunse step me kya change hua)
+  UI Excel upload -> api/Meter/ImportConsumerNewMeterDataByExcel (NO CHANGE)
+  -> Hangfire ImportExcelData (NO CHANGE) -> SqlBulkCopy -> dbo.TempConsumerNewMeter (+COLUMN)
+  -> SYNCCONSUMERNEWMETER proc (UPDATED - ab IsReplacementMeter bhi INSERT karta hai)
+  -> ConsumerNewMeterDetails (main table - column PEHLE SE THA, VARCHAR(255))
+  -> ProductionMeter insert (unchanged) -> temp TRUNCATE (unchanged)
+
+### CHANGES
+- SQL: CONSUMER_EXCEL_ISREPLACEMENTMETER_SQL_NOTES.sql (repo root, IDEMPOTENT):
+  [1] ALTER TABLE TempConsumerNewMeter ADD IsReplacementMeter VARCHAR(255) NULL (IF NOT EXISTS guard)
+  [2] SYNCCONSUMERNEWMETER proc CREATE OR ALTER - INSERT me IsReplacementMeter add, baaki
+      STEP 1/3/4 BILKUL UNCHANGED (existing-consumer delete / ProductionMeter insert / TRUNCATE)
+  [3] Built-in verify (expected: TempHasColumn=1, ProcHasIsRep=1, FinalHasColumn=1)
+- C# (2 files + 1 duplicate copy, build 0 errors):
+  * SmartMeterAdmin.Infrastructure/Helpers/ColumnNameByTable.cs: TempConsumerNewMeterTable()
+    mapping me { "IsReplacementMeter", "IsReplacementMeter" } add
+  * BulkCopy OPTIONAL-COLUMN GUARD (IMPORTANT): ImportExcelDataIntoDatabase.cs ke
+    InsertDataIntoTable me ab `if (dt.Columns.Contains(column.Key))` guard hai - warna PURANE
+    format ki Excel (IsReplacementMeter column ke bina) upload pe SqlBulkCopy
+    'ColumnMapping does not match' throw karta. GUARD 2 JAGAH LAGAYA:
+    - SmartMeterAdmin/SmartmeterAdmin.Hangfire/ExcelJobs/ImportExcelDataIntoDatabase.cs  <-- YE LIVE HAI (CS0436 se inner copy jeet jaati hai)
+    - SmartmeterAdmin.Hangfire/ExcelJobs/ImportExcelDataIntoDatabase.cs (outer Hangfire project - consistency)
+  * NOTE (pre-existing known issue): ImportExcelDataIntoDatabase 2 copies me hai aur
+    SmartMeterAdmin project wali (inner, ExcelDataReader-based) hi controllers use karte hain -
+    outer wali dead code CS0436 warning. (Isi wajah se 29->30 warnings - 1 naya CS0436 mapping change se.)
+
+### LOCAL E2E TEST (23-Oct, StoreDB localhost, REAL API + Hangfire ke through) - SAB PASS
+- Login user 36 (vaibhavsahumz@gmail.com) - password local pe TEST@123 set kiya test ke liye
+  (TripleDES hex; PURANA PASSWORD OVERWRITE HO GAYA - user ko local pe wapas set karna hoga)
+- Test 1 (NAYA format, IsReplacementMeter header ke sath):
+  Row 1 IsReplacementMeter="YES" -> ConsumerNewMeterDetails me IsRep="YES" PASS
+  Row 2 blank -> IsRep=NULL PASS (date 22/10/2026 theek parse, UserID=36 set, temp truncate, ProductionMeter 2 insert)
+- Test 2 (PURANA format, IsReplacementMeter header BINA) -> upload PASS, row insert, IsRep=NULL PASS
+  (optional-column guard kaam kar raha hai - naye deploy ke baad bhi purani Excel files chalengi)
+- Cleanup: BuffyTest* rows ConsumerNewMeterDetails + ProductionMeter dono se delete, temp khaali, API band
+
+### PROD DEPLOY (user karega, ORDER ME)
+1. SSMS: CONSUMER_EXCEL_ISREPLACEMENTMETER_SQL_NOTES.sql (USE [StoreDB] check) -> verify 1/1/1
+2. Backend publish (DONETAPI copy, appsettings skip, IIS restart) - changed files:
+   SmartMeterAdmin.Infrastructure.dll (ColumnNameByTable), SmartMeterAdmin.dll,
+   SmartmeterAdmin.Hangfire.dll (dono ImportExcelDataIntoDatabase)
+3. UI me kuch nahi - Excel me naya column "IsReplacementMeter" add karke upload
+   (header me space ho to bhi chalega - code space strip karta hai)
+
+## ============================================================ SESSION 21-Oct: DT -> DTC DATA SHIFT SCRIPT (LOCAL TESTED, PROD PENDING) ============================================================
 # Last updated: 21-Oct-2026 - DT->DTC DATA SHIFT SCRIPT (Excel/notepad driven, LOCAL TESTED - PROD KAL KARNA HAI - STEP-BY-STEP GUIDE NEECHE)
 # >>> 21-Oct: DT survey data ko DTC side (DTCSurvey/DTCSurveyMeter/DTCNewMeterDetails) me shift karne ka GENERIC script bana. 3 fields (ConsumerId | NewConsumerId | NewSmartMeterSrNo) Excel/notepad se deta hai user, baaki sab DT side se auto-map hota hai. 4 files: DT_TO_DTC_SHIFT_SQL_NOTES.sql (copy+backup) + DT_TO_DTC_VERIFY_SQL_NOTES.sql (compare) + DT_TO_DTC_DELETE_SQL_NOTES.sql (delete - ALAG, user compare karke chalayega) + DT_TO_DTC_INPUT_TEMPLATE.txt. Local pe 2 consumers (803HAZ0219/803HAZ0220) pe E2E TEST PASS (44 fields field-by-field PASS, API se bhi verify). PROD PE KAL KARNA HAI - STEP-BY-STEP GUIDE SESSION 21-Oct section me. <<<
 # Last updated: 10-Oct-2026 - AUDIT ACCESS: PERMISSIONS 3 -> 2 (View | Edit & Delete), CanDelete REMOVED - DB/API/UI + LOCAL TEST + PROD DEPLOY (DB+API DONE, UI DIST COPY BAKI)

@@ -298,10 +298,9 @@ namespace SmartMeterAdmin.Infrastructure.Helpers
                 { "FeederControlPanelPhoto", "FeederControlPanelPhoto" },
                 { "OldMeterNo","OldMeterNo" },
                 { "MeterMaker","MeterMaker" },
-                { "MeterType", "MeterType" },
-                { "MeterBoxSealNo", "MeterBoxSealNo" },
+                { "MeterType", "MeterType" },                { "MeterBoxSealNo", "MeterBoxSealNo" },
                 { "ICCID", "ICCID" },
-                { "SIMNW","SIMNW" },
+                { "SIMNW", "SIMNW" },
             };
         }
 
@@ -328,6 +327,7 @@ namespace SmartMeterAdmin.Infrastructure.Helpers
                 { "InstallerName", "InstallerName" },
                 { "InstallerMobileNo", "InstallerMobileNo" },
                 { "MeterMaker", "MeterMaker" },
+                { "IsReplacementMeter", "IsReplacementMeter" },
                 { "MeterBoxSealNo", "MeterBoxSealNo" },
                 { "ICCID", "ICCID" },
                 { "SIMNW", "SIMNW" },

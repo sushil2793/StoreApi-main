@@ -140,12 +140,13 @@ namespace SmartmeterAdmin.Hangfire.ExcelJobs
  using SqlConnection con = new(databaseConString);
  using SqlBulkCopy sqlBulkCopy = new(con);
 
- sqlBulkCopy.DestinationTableName = $"dbo.{tableName}";
-
- foreach (var column in columns)
- {
- sqlBulkCopy.ColumnMappings.Add(column.Key, column.Value);
- }
+ sqlBulkCopy.DestinationTableName = $"dbo.{tableName}";            foreach (var column in columns)
+            {
+                // Optional column (jaise IsReplacementMeter): Excel me column na ho to
+                // mapping skip - warna SqlBulkCopy 'ColumnMapping does not match' throw karta hai
+                if (dt.Columns.Contains(column.Key))
+                    sqlBulkCopy.ColumnMappings.Add(column.Key, column.Value);
+            }
 
  con.Open();
  sqlBulkCopy.WriteToServer(dt);
