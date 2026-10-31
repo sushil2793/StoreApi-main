@@ -107,7 +107,7 @@ namespace SmartmeterAdmin.Hangfire.ExcelJobs
 
  foreach (DataColumn col in dt.Columns)
  {
- col.ColumnName = col.ColumnName.Replace(" ", "");
+ col.ColumnName = col.ColumnName.Replace(" ", "").Replace("*", "");
  }
 
  return dt;

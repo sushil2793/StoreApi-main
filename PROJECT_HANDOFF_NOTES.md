@@ -1,6 +1,74 @@
 # REPLACEMENT METER - PROJECT STATUS (Handoff Notes)
+# Last updated: 30-Oct-2026 - DT EXCEL IMPORT FIX: TempDTSurvey +5 columns + SYNCDTSURVEY proc (Msg 213 + ColumnMapping crash) - SQL ONLY, LOCAL E2E PASS, PROD PENDING (neeche Session 30-Oct)
 # Last updated: 23-Oct-2026 - CONSUMER EXCEL UPLOAD: IsReplacementMeter column add - DB (TempConsumerNewMeter + SYNCCONSUMERNEWMETER proc) + C# (mapping + BulkCopy optional-column guard) - LOCAL E2E TEST PASS, PROD DEPLOY PENDING (neeche Session 23-Oct)
 # Last updated: 22-Oct-2026 - DT->DTC: SAB SCRIPTS EK FILE ME: DT_TO_DTC_FULL_RUN_ONE_FILE.sql (STEP 1..8, 8 consumers baked, delete @@Confirm gate + rollback proc). PURANI 4 script files DELETE ho gayin.
+
+## ============================================================ SESSION 30-Oct: DT EXCEL IMPORT FIX - TempDTSurvey + SYNCDTSURVEY (LOCAL E2E PASS, PROD PENDING) ============================================================
+
+USER REPORT: "Import DT Data" Excel upload fail - UI pe "File Uploaded For Processing" dikhta
+tha lekin row kabhi main table me nahi aati thi. UI/UX fix NAHI chahiye tha, NewConsumerId
+behavior change nahi chahiye tha, SQL-only fix authorized (user prod pe SQL khud chalayenge,
+build deploy khud karenge).
+
+### ROOT CAUSE (2 blockers, dono confirmed)
+- ISSUE 1 (upload crash): dbo.TempDTSurvey me sirf 56 columns the. C# mapping
+  (ColumnNameByTable.TempDTSurveyTable = 61 entries) + sample Excel template (61 headers)
+  dono me ZoneCode/CircleCode/DivisionCode/SubDivisionCode/NewConsumerId the -> SqlBulkCopy
+  throw karta: "The given ColumnMapping does not match up with any column in the source or
+  destination" (ImportExcelDataIntoDatabase.InsertDataIntoTable). Hangfire job Failed
+  (AutomaticRetry=0) -> SyncDTData continuation kabhi chalta hi nahi (Awaiting stuck).
+- ISSUE 2 (proc crash, latent): SYNCDTSURVEY proc ka INSERT INTO DTRecivedConsumer 15 values
+  deta tha lekin table ke 19 columns the (4 codes 13-Jun-2026 ko add hue the) -> Msg 213
+  "Column name or number of supplied values does not match table definition" (0 rows pe bhi
+  fail). Proc me transaction NAHI tha -> agar baad ki statement fail hoti to partial commit
+  se orphan rows DTRecivedSurvey/DTRecivedMeter me aa jaate (GETALLDTDATA INNER JOIN hai ->
+  invisible).
+
+### CHANGES (SQL ONLY - zero code/UI change, NO BUILD NEEDED)
+- SQL: DT_EXCEL_IMPORT_FIX_SQL_NOTES.sql (repo root, idempotent, safe re-run):
+  [1] ALTER TABLE TempDTSurvey ADD 5 columns (COL_LENGTH guard + dynamic SQL):
+      ZoneCode/CircleCode/DivisionCode/SubDivisionCode = nvarchar(100) (DTRecivedConsumer
+      codes ki tarah; varchar->nvarchar implicit conversion safe), NewConsumerId =
+      varchar(255) (temp table convention; proc isko kabhi padhta nahi - NULL jaata hai)
+  [2] CREATE OR ALTER PROC SYNCDTSURVEY:
+      - SET XACT_ABORT ON + BEGIN TRY / TRAN / COMMIT / CATCH / ROLLBACK / THROW
+        (atomic sync, error Hangfire me visible)
+      - pehla UPDATE (DTRecivedConsumer) ab 4 codes bhi ISNULL pattern se carry karta hai
+      - teeno INSERTs ab EXPLICIT column lists use karte hain (schema-drift bug class fix)
+      - DTRecivedSurvey.NewConsumerId = NULL rakhne ka behavior BILKUL UNCHANGED (user
+        requirement: Excel wala NewConsumerId mat carry karo)
+  [3] Verify queries + expected output (file me likhe hue hain)
+- DTRecivedConsumer ka ALTER DEFENSIVE add NAHI kiya (19 columns pehle se the, sirf proc
+  ki supply 15 thi).
+
+### LOCAL E2E TEST (30-Oct, StoreDB localhost, REAL API + Hangfire) - SAB PASS
+- API restart karna pada (purana process hung tha, koi port listen nahi kar raha tha).
+  SSL dev-cert dikkat ke liye HTTP endpoint use kiya (http://localhost:5102).
+- Login Superadmin (api/Account/Login, DeviceType field zaroori hai - warna Claim crash).
+- Test Excel: sample template copy karke 61/61 fields fill (ConsumerId=BUFFYDTTEST01,
+  ZoneCode=Z1, CircleCode=C1, DivisionCode=D1, SubDivisionCode=SD1, NewConsumerId=1000999001,
+  DateOfSurvey=30/10/2026). Upload curl.exe se (PowerShell manual multipart file signature
+  bigad deta hai).
+- Result: job 149954 (import) Succeeded + 149955 (SyncDTData continuation) Succeeded.
+  DTRecivedSurvey/Consumer/Meter = 2249-2249-2249 (baseline 2248 se +1). BuffYDTTEST01
+  teeno tables me. DTRecivedConsumer me ZoneCode=Z1, CircleCode=C1, DivisionCode=D1,
+  SubDivisionCode=SD1 (codes carry). DateOfSurvey = '30/10/2026' clean. DTRecivedSurvey
+  NewConsumerId = NULL (behavior preserved). GetAllDTDataRender API row return karti hai
+  (UI list path OK).
+- Cleanup: BUFFYDTTEST01 teeno tables se delete + TempDTSurvey me lingering row delete
+  (temp row next sync pe delete hoti hai - pre-existing design, DELETE INSERT se pehle
+  chalta hai, unchanged). Baseline 2248/2248/2248 restored, TempDT=0.
+
+### PROD DEPLOY (user karega, ORDER ME)
+1. SSMS: purane SYNCDTSURVEY ka "Script Stored Procedure as CREATE" lekar save karo
+   (rollback ke liye)
+2. SSMS: DT_EXCEL_IMPORT_FIX_SQL_NOTES.sql StoreDB par run (USE [StoreDB] file me hai -
+   DB name verify kar lena)
+3. Verify section chalao: TempDT_ColCount=61, 5 columns ka type check, Consumer_ColCount=19,
+   ProcExists=1/HasTransaction=1/HasCodes=1, OrphanSurveyRows (purane historical orphans
+   dikha sakte hain 13-Jun-2026 se - business decision, script unhe delete NAHI karta)
+4. NO app restart / NO deploy / NO build - SQL only hai. Excel template + C# mapping pehle
+   se 61 columns ke saath match karte hain.
 
 ## ============================================================ SESSION 23-Oct: CONSUMER EXCEL UPLOAD - IsReplacementMeter COLUMN (LOCAL DONE + E2E PASS, PROD PENDING) ============================================================
 
