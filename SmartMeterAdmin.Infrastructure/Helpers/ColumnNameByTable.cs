@@ -622,10 +622,6 @@ namespace SmartMeterAdmin.Infrastructure.Helpers
     { "StreetColonyLocality", "StreetColonyLocality" },
     { "Block", "Block" },
     { "District", "District" },
-    { "ZoneCode", "ZoneCode" },
-    { "CircleCode", "CircleCode" },
-    { "DivisionCode", "DivisionCode" },
-    { "SubDivisionCode", "SubDivisionCode" },
     { "NewConsumerId", "NewConsumerId" }
 };
         }
