@@ -1,9 +1,10 @@
 # REPLACEMENT METER - PROJECT STATUS (Handoff Notes)
+# Last updated: 17-Nov-2026 - USER CONFIRM: PROD DEPLOY HO GAYA - (2) Consumer IsReplacementMeter SQL+backend, (3) DT->DTC shift full run, (4) Audit Access PROD UI dist copy - TEENO DONE. BAKI: (1) DT Excel fix SQL (Session 30-Oct) + (5) purane 30-Sep SQL scripts (ADMIN_FULL_ACCESS / USER_MANAGE_TEMPLATE / ADMIN_USER_UI_FIX) - DONO BAAD ME KARENGE.
 # Last updated: 30-Oct-2026 - DT EXCEL IMPORT FIX: TempDTSurvey +5 columns + SYNCDTSURVEY proc (Msg 213 + ColumnMapping crash) - SQL ONLY, LOCAL E2E PASS, PROD PENDING (neeche Session 30-Oct)
 # Last updated: 23-Oct-2026 - CONSUMER EXCEL UPLOAD: IsReplacementMeter column add - DB (TempConsumerNewMeter + SYNCCONSUMERNEWMETER proc) + C# (mapping + BulkCopy optional-column guard) - LOCAL E2E TEST PASS, PROD DEPLOY PENDING (neeche Session 23-Oct)
 # Last updated: 22-Oct-2026 - DT->DTC: SAB SCRIPTS EK FILE ME: DT_TO_DTC_FULL_RUN_ONE_FILE.sql (STEP 1..8, 8 consumers baked, delete @@Confirm gate + rollback proc). PURANI 4 script files DELETE ho gayin.
 
-## ============================================================ SESSION 30-Oct: DT EXCEL IMPORT FIX - TempDTSurvey + SYNCDTSURVEY (LOCAL E2E PASS, PROD PENDING) ============================================================
+## ============================================================ SESSION 30-Oct: DT EXCEL IMPORT FIX - TempDTSurvey + SYNCDTSURVEY (LOCAL E2E PASS, PROD PENDING - BAAD ME KARNA HAI) ============================================================
 
 USER REPORT: "Import DT Data" Excel upload fail - UI pe "File Uploaded For Processing" dikhta
 tha lekin row kabhi main table me nahi aati thi. UI/UX fix NAHI chahiye tha, NewConsumerId
@@ -70,7 +71,7 @@ build deploy khud karenge).
 4. NO app restart / NO deploy / NO build - SQL only hai. Excel template + C# mapping pehle
    se 61 columns ke saath match karte hain.
 
-## ============================================================ SESSION 23-Oct: CONSUMER EXCEL UPLOAD - IsReplacementMeter COLUMN (LOCAL DONE + E2E PASS, PROD PENDING) ============================================================
+## ============================================================ SESSION 23-Oct: CONSUMER EXCEL UPLOAD - IsReplacementMeter COLUMN (LOCAL DONE + E2E PASS, PROD DEPLOY DONE 17-Nov) ============================================================
 
 USER REQUIREMENT: ConsumerNewMeterDataExcel upload me user ab ek naya column "IsReplacementMeter"
 Excel me khud bharega - upload pe wo value final table (ConsumerNewMeterDetails) me update ho jaye.
@@ -120,8 +121,7 @@ UI ME KOI CHANGE NAHI (Excel me hi column bharna hai).
 3. UI me kuch nahi - Excel me naya column "IsReplacementMeter" add karke upload
    (header me space ho to bhi chalega - code space strip karta hai)
 
-## ============================================================ SESSION 21-Oct: DT -> DTC DATA SHIFT SCRIPT (LOCAL TESTED, PROD PENDING) ============================================================
-# Last updated: 21-Oct-2026 - DT->DTC DATA SHIFT SCRIPT (Excel/notepad driven, LOCAL TESTED - PROD KAL KARNA HAI - STEP-BY-STEP GUIDE NEECHE)
+## ============================================================ SESSION 21-Oct: DT -> DTC DATA SHIFT SCRIPT (LOCAL TESTED, PROD DEPLOY DONE 17-Nov) ============================================================
 # >>> 21-Oct: DT survey data ko DTC side (DTCSurvey/DTCSurveyMeter/DTCNewMeterDetails) me shift karne ka GENERIC script bana. 3 fields (ConsumerId | NewConsumerId | NewSmartMeterSrNo) Excel/notepad se deta hai user, baaki sab DT side se auto-map hota hai. 4 files: DT_TO_DTC_SHIFT_SQL_NOTES.sql (copy+backup) + DT_TO_DTC_VERIFY_SQL_NOTES.sql (compare) + DT_TO_DTC_DELETE_SQL_NOTES.sql (delete - ALAG, user compare karke chalayega) + DT_TO_DTC_INPUT_TEMPLATE.txt. Local pe 2 consumers (803HAZ0219/803HAZ0220) pe E2E TEST PASS (44 fields field-by-field PASS, API se bhi verify). PROD PE KAL KARNA HAI - STEP-BY-STEP GUIDE SESSION 21-Oct section me. <<<
 # Last updated: 10-Oct-2026 - AUDIT ACCESS: PERMISSIONS 3 -> 2 (View | Edit & Delete), CanDelete REMOVED - DB/API/UI + LOCAL TEST + PROD DEPLOY (DB+API DONE, UI DIST COPY BAKI)
 # >>> 03-Oct: Consumer push (UpdateHesStatus CONSUMER) ab sync 1-by-1 hota hai aur response me poora push log (payload + HES response + status) aata hai. UI ME KOI CHANGE NAHI. Backend 4 files, build 0 errors, DEPLOY PENDING (neeche Session 03-Oct). <<<
@@ -307,7 +307,7 @@ STEP 7 - (agar rollback chahiye)
 - ProductionMeter me meter no (MZ000xxxx) pehle se hona chahiye - nahi hai to DTC new meter grid
   me us meter ke columns (MeterType/ICCID/SIMNW/MeterBoxSealNo) NULL dikhenge (row dikhegi).
 
-## ============================================================ SESSION 10-Oct: AUDIT ACCESS 2-PERMISSION (View | Edit & Delete) - CanDelete REMOVED - DB+API+UI, PROD DB/API DEPLOYED, PROD UI DIST COPY BAKI ============================================================
+## ============================================================ SESSION 10-Oct: AUDIT ACCESS 2-PERMISSION (View | Edit & Delete) - CanDelete REMOVED - DB+API+UI SAB PROD ME DONE (17-Nov confirm) ============================================================
 
 USER REQUIREMENT: Audit access permission model 3 permissions (View / Edit / Delete) se 2 me
 convert karo - sirf View aur combined "Edit & Delete" (ek checkbox dono kaam kare). TABLE, UI
@@ -386,10 +386,7 @@ lena dena nahi - wo alag cheez hai.
   (folder-in-folder copy se bachna)
 
 ### REMAINING (user karega)
-1. PROD UI dist copy: local D:/UI/StoreUI se `ng build --prod` (Node 22 pe --openssl-legacy-provider
-   env chahiye) => dist/SmartMeterInstallation ke andar ki files PROD server wale folder me copy
-   karo jahan index.html + main.0efdb... pada hai => purane hashed js overwrite => Ctrl+Shift+R
-   (naya bundle hash live index.html me match check karo)
+1. ~~PROD UI dist copy~~ DONE (17-Nov confirm) - Audit Access UI ab production pe live hai
 2. OPTIONAL (future): admin-user.component.html me purana BULK-DELETE toolbar button
    (deleteSelectedRows) abhi bhi hai - gating decide nahi hui, user decide karega
 3. UI create-admin-user form me Audit Access section ka visual confirmation user-side nahi hua
